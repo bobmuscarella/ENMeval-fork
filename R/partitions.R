@@ -235,139 +235,157 @@ get.block <- function(occs, bg, orientation = "lat_lon"){
 #' 
 #' @export
 
-get.checkerboard <- function(occs, envs, bg, aggregation.factor,
-                              gridSampleN = 10000){
-  message("Removing duplicate points...")
-  occs <- occs[!duplicated(occs),]
-  bg <- bg[!duplicated(bg),]
-  
-  if(is.null(envs)) stop("Cannot use checkerboard partitioning if envs is NULL.")
-  if(length(aggregation.factor) == 1) {
+get.checkerboard <- function (occs, envs, bg, aggregation.factor, gridSampleN = 10000) 
+{
+  if (is.null(envs)) 
+    stop("Cannot use checkerboard partitioning if envs is NULL.")
+  if (length(aggregation.factor) == 1) {
     message("Generating basic checkerboard partitions...")
-  } else if(length(aggregation.factor) == 2){
+  }
+  else if (length(aggregation.factor) == 2) {
     message("Generating hierarchical checkerboard partitions...")
-  } else {
+  }
+  else {
     stop("You can only input one (for basic) or two (for hierarchical) aggregation factors.")
   }
-  if(length(names(occs)) > 2) stop("Please input occs with only two columns: longitude and latitude.")
-  if(length(names(bg)) > 2) stop("Please input bg with only two columns: longitude and latitude.")
-  occs.v <- as.data.frame(occs) |> terra::vect(geom = colnames(occs))
-  bg.v <- as.data.frame(bg) |> terra::vect(geom = colnames(bg))
-
-  # make checkerboards  
-  grid <- terra::aggregate(envs[[1]], fact=aggregation.factor[1])
+  if (length(names(occs)) > 2) 
+    stop("Please input occs with only two columns: longitude and latitude.")
+  if (length(names(bg)) > 2) 
+    stop("Please input bg with only two columns: longitude and latitude.")
+  occs.v <- terra::vect(as.data.frame(occs), geom = colnames(occs))
+  bg.v <- terra::vect(as.data.frame(bg), geom = colnames(bg))
+  
+  # Maintain row numbers
+  occs.v$row <- 1:nrow(occs)
+  bg.v$row <- 1:nrow(bg)
+  
+  grid <- terra::aggregate(envs[[1]], fact = aggregation.factor[1])
   occs.w <- terra::spatSample(occs.v, size = gridSampleN, strata = grid, 
-                              chess='white')
+                              chess = "white")
   occs.b <- terra::spatSample(occs.v, size = gridSampleN, strata = grid, 
-                              chess='black')
+                              chess = "black")
   bg.w <- terra::spatSample(bg.v, size = gridSampleN, strata = grid, 
-                            chess='white')
+                            chess = "white")
   bg.b <- terra::spatSample(bg.v, size = gridSampleN, strata = grid, 
-                            chess='black')
-  
-  # for hierarchical checkerboards, which need two aggregation factors
-  if(length(aggregation.factor) == 2) {
-    grid2 <- terra::aggregate(grid, fact=aggregation.factor[2])
-    occs.ww <- terra::spatSample(occs.w, size = gridSampleN, strata = grid2, 
-                                 chess='white')
-    occs.wb <- terra::spatSample(occs.w, size = gridSampleN, strata = grid2, 
-                                 chess='black')
-    occs.bb <- terra::spatSample(occs.b, size = gridSampleN, strata = grid2, 
-                                 chess='black')
-    occs.bw <- terra::spatSample(occs.b, size = gridSampleN, strata = grid2, 
-                                 chess='white')
-    bg.ww <- terra::spatSample(bg.w, size = gridSampleN, strata = grid2, 
-                               chess='white')
-    bg.wb <- terra::spatSample(bg.w, size = gridSampleN, strata = grid2, 
-                               chess='black')
-    bg.bb <- terra::spatSample(bg.b, size = gridSampleN, strata = grid2, 
-                               chess='black')
-    bg.bw <- terra::spatSample(bg.b, size = gridSampleN, strata = grid2, 
-                               chess='white')
+                            chess = "black")
+  if (length(aggregation.factor) == 2) {
+    grid2 <- terra::aggregate(grid, fact = aggregation.factor[2])
+    occs.ww <- terra::spatSample(occs.w, size = gridSampleN, 
+                                 strata = grid2, chess = "white")
+    occs.wb <- terra::spatSample(occs.w, size = gridSampleN, 
+                                 strata = grid2, chess = "black")
+    occs.bb <- terra::spatSample(occs.b, size = gridSampleN, 
+                                 strata = grid2, chess = "black")
+    occs.bw <- terra::spatSample(occs.b, size = gridSampleN, 
+                                 strata = grid2, chess = "white")
+    bg.ww <- terra::spatSample(bg.w, size = gridSampleN, 
+                               strata = grid2, chess = "white")
+    bg.wb <- terra::spatSample(bg.w, size = gridSampleN, 
+                               strata = grid2, chess = "black")
+    bg.bb <- terra::spatSample(bg.b, size = gridSampleN, 
+                               strata = grid2, chess = "black")
+    bg.bw <- terra::spatSample(bg.b, size = gridSampleN, 
+                               strata = grid2, chess = "white")
   }
-  
-  # assemble groups
   if (length(aggregation.factor) == 1) {
     occs.w <- terra::crds(occs.w, df = TRUE)
     occs.b <- terra::crds(occs.b, df = TRUE)
-    
-    if(nrow(occs.w) > 0) { occs.w$grp <- 1 }
-    if(nrow(occs.b) > 0) { occs.b$grp <- 2 }
+    if (nrow(occs.w) > 0) {
+      occs.w$grp <- 1
+    }
+    if (nrow(occs.b) > 0) {
+      occs.b$grp <- 2
+    }
     occs.r <- rbind(occs.w, occs.b)
-    
-    # find the original row names and sort the spatSample
-    # output table to match the original occs table
     occs.rn <- cbind(occs, 1:nrow(occs))
     names(occs.rn) <- c(names(occs.r)[1:2], "row")
     occs.r.m <- merge(occs.r, occs.rn, by = c("x", "y"))
-    occs.r <- occs.r.m[order(as.numeric(occs.r.m$row)),]
-    
+    occs.r <- occs.r.m[order(as.numeric(occs.r.m$row)), ]
     occs.grp <- occs.r$grp
-    
     bg.w <- terra::crds(bg.w, df = TRUE)
     bg.b <- terra::crds(bg.b, df = TRUE)
-    if(nrow(bg.w) > 0) { bg.w$grp <- 1 }
-    if(nrow(bg.b) > 0) { bg.b$grp <- 2 }
+    if (nrow(bg.w) > 0) {
+      bg.w$grp <- 1
+    }
+    if (nrow(bg.b) > 0) {
+      bg.b$grp <- 2
+    }
     bg.r <- rbind(bg.w, bg.b)
-    
     bg.rn <- cbind(bg, 1:nrow(bg))
     names(bg.rn) <- c(names(bg.r)[1:2], "row")
     bg.r.m <- merge(bg.r, bg.rn, by = c("x", "y"))
-    bg.r <- bg.r.m[order(as.numeric(bg.r.m$row)),]
-    
-    bg.grp <- bg.r$grp
-    
-  } else if (length(aggregation.factor) == 2) {
-    occs.ww <- terra::crds(occs.ww, df = TRUE)
-    occs.bw <- terra::crds(occs.bw, df = TRUE)
-    occs.wb <- terra::crds(occs.wb, df = TRUE)
-    occs.bb <- terra::crds(occs.bb, df = TRUE)
-    occs.r <- data.frame()
-    if (nrow(occs.ww) > 0) occs.ww$grp <- 1; occs.r <- rbind(occs.r, occs.ww)
-    if (nrow(occs.wb) > 0) occs.wb$grp <- 2; occs.r <- rbind(occs.r, occs.wb)
-    if (nrow(occs.bw) > 0) occs.bw$grp <- 3; occs.r <- rbind(occs.r, occs.bw)
-    if (nrow(occs.bb) > 0) occs.bb$grp <- 4; occs.r <- rbind(occs.r, occs.bb)
-    
-    occs.rn <- cbind(occs, 1:nrow(occs))
-    names(occs.rn) <- c(names(occs.r)[1:2], "row")
-    occs.r.m <- merge(occs.r, occs.rn, by = c("x", "y"))
-    occs.r <- occs.r.m[order(as.numeric(occs.r.m$row)),]
-    
-    occs.grp <- occs.r$grp
-    
-    bg.ww <- terra::crds(bg.ww, df = TRUE)
-    bg.bw <- terra::crds(bg.bw, df = TRUE)
-    bg.wb <- terra::crds(bg.wb, df = TRUE)
-    bg.bb <- terra::crds(bg.bb, df = TRUE)
-    bg.r <- data.frame()
-    if (nrow(bg.ww) > 0) bg.ww$grp <- 1; bg.r <- rbind(bg.r, bg.ww)
-    if (nrow(bg.wb) > 0) bg.wb$grp <- 2; bg.r <- rbind(bg.r, bg.wb)
-    if (nrow(bg.bw) > 0) bg.bw$grp <- 3; bg.r <- rbind(bg.r, bg.bw)
-    if (nrow(bg.bb) > 0) bg.bb$grp <- 4; bg.r <- rbind(bg.r, bg.bb)
-    
-    bg.rn <- cbind(bg, 1:nrow(bg))
-    names(bg.rn) <- c(names(bg.r)[1:2], "row")
-    bg.r.m <- merge(bg.r, bg.rn, by = c("x", "y"))
-    bg.r <- bg.r.m[order(as.numeric(bg.r.m$row)),]
-    
+    bg.r <- bg.r.m[order(as.numeric(bg.r.m$row)), ]
     bg.grp <- bg.r$grp
   }
-  
-  # PATCH IF occs OR BG POINTS FALL INTO A SINGLE BIN
+  else if (length(aggregation.factor) == 2) {
+    occs.ww <- cbind(terra::crds(occs.ww, df = TRUE), occs.ww$row)
+    occs.bw <- cbind(terra::crds(occs.bw, df = TRUE), occs.bw$row)
+    occs.wb <- cbind(terra::crds(occs.wb, df = TRUE), occs.wb$row)
+    occs.bb <- cbind(terra::crds(occs.bb, df = TRUE), occs.bb$row)
+    
+    names(occs.ww)[3] <- "row"
+    names(occs.bw)[3] <- "row"
+    names(occs.wb)[3] <- "row"
+    names(occs.bb)[3] <- "row"
+    
+    occs.r <- data.frame()
+    if (nrow(occs.ww) > 0) 
+      occs.ww$grp <- 1
+    occs.r <- rbind(occs.r, occs.ww)
+    if (nrow(occs.wb) > 0) 
+      occs.wb$grp <- 2
+    occs.r <- rbind(occs.r, occs.wb)
+    if (nrow(occs.bw) > 0) 
+      occs.bw$grp <- 3
+    occs.r <- rbind(occs.r, occs.bw)
+    if (nrow(occs.bb) > 0) 
+      occs.bb$grp <- 4
+    occs.r <- rbind(occs.r, occs.bb)
+    
+    occs.r <- occs.r[order(as.numeric(occs.r$row)), ]
+    occs.grp <- occs.r$grp
+    
+    bg.ww <- cbind(terra::crds(bg.ww, df = TRUE), bg.ww$row)
+    bg.bw <- cbind(terra::crds(bg.bw, df = TRUE), bg.bw$row)
+    bg.wb <- cbind(terra::crds(bg.wb, df = TRUE), bg.wb$row)
+    bg.bb <- cbind(terra::crds(bg.bb, df = TRUE), bg.bb$row)
+    
+    names(bg.ww)[3] <- "row"
+    names(bg.bw)[3] <- "row"
+    names(bg.wb)[3] <- "row"
+    names(bg.bb)[3] <- "row"
+    
+    bg.r <- data.frame()
+    if (nrow(bg.ww) > 0) 
+      bg.ww$grp <- 1
+    bg.r <- rbind(bg.r, bg.ww)
+    if (nrow(bg.wb) > 0) 
+      bg.wb$grp <- 2
+    bg.r <- rbind(bg.r, bg.wb)
+    if (nrow(bg.bw) > 0) 
+      bg.bw$grp <- 3
+    bg.r <- rbind(bg.r, bg.bw)
+    if (nrow(bg.bb) > 0) 
+      bg.bb$grp <- 4
+    bg.r <- rbind(bg.r, bg.bb)
+    
+    bg.r <- bg.r[order(as.numeric(bg.r$row)), ]
+    bg.grp <- bg.r$grp
+  }
+
   noccs.grp <- length(unique(occs.grp))
   nbg.grp <- length(unique(bg.grp))
-  if(noccs.grp < 2 ){
-    message(paste("Warning: occurrence points fall in only", noccs.grp, "bin"))
-    bg.grp[ ! bg.grp %in% occs.grp] <- NA
+  if (noccs.grp < 2) {
+    message(paste("Warning: occurrence points fall in only", 
+                  noccs.grp, "bin"))
+    bg.grp[!bg.grp %in% occs.grp] <- NA
     occs.grp <- as.numeric(as.factor(occs.grp))
     bg.grp <- as.numeric(as.factor(bg.grp))
   }
-  
-  if(length(unique(bg.grp[!is.na(bg.grp)])) != noccs.grp) {
+  if (length(unique(bg.grp[!is.na(bg.grp)])) != noccs.grp) {
     stop("Error: occurrence records but no background points fall in 1 or more evaluation bin(s)")
   }
-  
-  out <- list(occs.grp=occs.grp, bg.grp=bg.grp)
+  out <- list(occs.grp = occs.grp, bg.grp = bg.grp)
   return(out)
 }
 
